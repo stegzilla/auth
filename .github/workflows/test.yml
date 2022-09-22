@@ -1,4 +1,4 @@
-name: Test PR
+name: Test
 
 on:
   push:
@@ -17,6 +17,8 @@ jobs:
       #  with:
        #   go-version: "1.19"
        #   cache: true
+      - name: path
+        run: echo $PATH
 
       - name: Install dependencies
         run: go get .
