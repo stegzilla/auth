@@ -2,6 +2,7 @@ package token
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -78,12 +79,23 @@ func (t *ToDanniToken) HasProjectPermission(project string) bool {
 }
 
 func (t *ToDanniToken) GetUserInfo() (models.UserInfo, error) {
-	userInfo, ok := t.token.Get("user-info")
+	var userInfo models.UserInfo
+	data, ok := t.token.Get("user-info")
 	if !ok {
 		return models.UserInfo{}, errors.New("token doesn't contain user info")
 	}
 
-	return userInfo.(models.UserInfo), nil
+	m := data.(map[string]interface{})
+	jsonStr, err := json.Marshal(m)
+	if err != nil {
+		return models.UserInfo{}, err
+	}
+
+	if err := json.Unmarshal(jsonStr, &userInfo); err != nil {
+		return models.UserInfo{}, err
+	}
+
+	return userInfo, nil
 }
 
 func (t *ToDanniToken) SetUserInfo(userInfo models.UserInfo) *ToDanniToken {

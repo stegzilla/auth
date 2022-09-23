@@ -11,7 +11,6 @@ import (
 	"github.com/todanni/auth/models"
 	"github.com/todanni/auth/test"
 	"github.com/todanni/auth/token"
-	"gorm.io/gorm"
 )
 
 type AuthenticationCheckTestSuite struct {
@@ -56,22 +55,29 @@ func (s *AuthenticationCheckTestSuite) Test_AuthenticationCheck_Bad_InvalidToken
 }
 
 func (s *AuthenticationCheckTestSuite) Test_AuthenticationCheck_Good() {
-	user := models.User{
-		Model: gorm.Model{
-			ID: 1,
-		},
+	user := models.UserInfo{
+		UserID:     1,
 		Email:      "test@test.com",
 		ProfilePic: "",
 	}
-
 	dashboards := make([]models.Dashboard, 0)
 	projects := make([]models.Project, 0)
 
-	token, _ := token.IssueToDanniToken(user, s.key, dashboards, projects)
+	todanniToken := token.New()
+	todanniToken.SetUserInfo(user).
+		SetProjectsPermissions(projects).
+		SetDashboardPermissions(dashboards)
+
+	signedToken, err := todanniToken.SignedToken(s.key)
+	require.NoError(s.T(), err)
+
 	handler := NewAuthenticationCheck(func(w http.ResponseWriter, r *http.Request) {
-		userInfo := r.Context().Value(UserInfoContextKey).(models.UserInfo)
-		if userInfo.UserID != user.ID {
-			s.T().Errorf("user info incorrect, expected %v but got %v", user.ID, userInfo.UserID)
+		accessToken := r.Context().Value(AccessTokenContextKey).(*token.ToDanniToken)
+		require.NotNil(s.T(), accessToken)
+		userInfo, err := accessToken.GetUserInfo()
+		require.NoError(s.T(), err)
+		if userInfo.UserID != user.UserID {
+			s.T().Errorf("user info incorrect, expected %v but got %v", user.UserID, userInfo.UserID)
 		}
 	})
 
@@ -79,7 +85,7 @@ func (s *AuthenticationCheckTestSuite) Test_AuthenticationCheck_Good() {
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	cookie := &http.Cookie{
 		Name:   "todanni-access-token",
-		Value:  token,
+		Value:  signedToken,
 		MaxAge: 300,
 	}
 	req.AddCookie(cookie)
